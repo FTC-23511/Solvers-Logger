@@ -8,55 +8,82 @@ export const parseLogFile = (content: string): ParsedData => {
   
   let startTime: number | null = null;
 
-  lines.forEach((line) => {
-    const parts = line.split(';');
-    if (parts.length !== 4) return;
-
-    const [timestamp, type, name, valueStr] = parts;
+  for (let i = 0; i < lines.length; i++) {
+    const currentLine = lines[i].trim();
+    const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
     
-    // Convert timestamp to seconds
-    const timeParts = timestamp.split(':').map(Number);
-    const timeInSeconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-    
-    if (startTime === null) {
-      startTime = timeInSeconds;
-    }
-    
-    const relativeTime = timeInSeconds - startTime;
-
-    let value: any = valueStr.trim();
-
-    // Parse Pose2d
-    if (type === 'Pose2d') {
-      const match = valueStr.match(/\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-      if (match) {
-        value = {
-          x: parseFloat(match[1]),
-          y: parseFloat(match[2]),
-          heading: parseFloat(match[3])
-        } as Pose2d;
-        poseFields.add(name);
-        // Add x and y as separate numeric fields for charting
-        numericFields.add(`${name}.x`);
-        numericFields.add(`${name}.y`);
+    if (nextLine.startsWith('INFO:')) {
+      const timeMatch = currentLine.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      if (!timeMatch) continue;
+      
+      const hours = parseInt(timeMatch[1]);
+      const minutes = parseInt(timeMatch[2]);
+      const seconds = parseInt(timeMatch[3]);
+      
+      let totalHours = hours;
+      if (currentLine.includes('PM') && hours !== 12) {
+        totalHours += 12;
+      } else if (currentLine.includes('AM') && hours === 12) {
+        totalHours = 0;
       }
-    } 
-    // Parse numeric types
-    else if (['double', 'long', 'int', 'float', 'number'].includes(type.toLowerCase())) {
-      value = parseFloat(valueStr);
-      if (!isNaN(value)) {
-        numericFields.add(name);
+      
+      const timeInSeconds = totalHours * 3600 + minutes * 60 + seconds;
+      
+      if (startTime === null) {
+        startTime = timeInSeconds;
       }
+      
+      const relativeTime = timeInSeconds - startTime;
+      
+      const dataLine = nextLine.substring(5).trim();
+      
+      const fields = dataLine.split(';').filter(f => f.trim());
+      
+      fields.forEach(field => {
+        const parts = field.split(':');
+        if (parts.length < 3) return;
+        
+        const name = parts[0].trim();
+        const type = parts[1].trim();
+        const valueStr = parts.slice(2).join(':').trim();
+        
+        let value: string | number | boolean | Pose2d = valueStr;
+        
+        if (type === 'Pose' || type === 'Pose2d') {
+          const match = valueStr.match(/\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+          if (match) {
+            value = {
+              x: parseFloat(match[1]),
+              y: parseFloat(match[2]),
+              heading: parseFloat(match[3])
+            } as Pose2d;
+            poseFields.add(name);
+            numericFields.add(`${name}.x`);
+            numericFields.add(`${name}.y`);
+          }
+        } 
+        else if (['Double', 'Long', 'Int', 'Float', 'Number', 'double', 'long', 'int', 'float', 'number'].includes(type)) {
+          value = parseFloat(valueStr);
+          if (!isNaN(value)) {
+            numericFields.add(name);
+          }
+        }
+        else if (type === 'Boolean' || type === 'boolean') {
+          value = valueStr === 'true';
+        }
+        
+        entries.push({
+          timestamp: currentLine,
+          type,
+          name,
+          value,
+          timeInSeconds: relativeTime
+        });
+      });
+      
+      i++;
     }
-
-    entries.push({
-      timestamp,
-      type,
-      name,
-      value,
-      timeInSeconds: relativeTime
-    });
-  });
+  }
 
   const maxTime = entries.length > 0 
     ? Math.max(...entries.map(e => e.timeInSeconds))

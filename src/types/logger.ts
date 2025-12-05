@@ -2,7 +2,7 @@ export interface LogEntry {
   timestamp: string;
   type: string;
   name: string;
-  value: any;
+  value: string | number | boolean | Pose2d;
   timeInSeconds: number;
 }
 

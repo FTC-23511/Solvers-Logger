@@ -8,8 +8,8 @@ interface FileUploadProps {
 
 export const FileUpload = ({ onFileLoad }: FileUploadProps) => {
   const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith('.txt')) {
-      toast.error("Please upload a .txt file");
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.log')) {
+      toast.error("Please upload a .txt or .log file");
       return;
     }
 
@@ -41,7 +41,7 @@ export const FileUpload = ({ onFileLoad }: FileUploadProps) => {
     >
       <input
         type="file"
-        accept=".txt"
+        accept=".txt,.log"
         onChange={handleChange}
         className="hidden"
         id="file-upload"
@@ -52,7 +52,7 @@ export const FileUpload = ({ onFileLoad }: FileUploadProps) => {
           Drop your log file here or click to browse
         </p>
         <p className="text-sm text-muted-foreground">
-          Accepts .txt files
+          Accepts .txt and .log files
         </p>
       </label>
     </div>
